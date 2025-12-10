@@ -26,6 +26,10 @@ export class MainScene extends Phaser.Scene {
   packetCount: number = 0; // Incoming
   sentCount: number = 0; // Outgoing
 
+  // Interpolation
+  targetState: any = null;
+  lerpFactor: number = 0.2; // 20% per frame smoothing
+
   constructor() {
     super({ key: "MainScene" });
   }
@@ -182,13 +186,11 @@ export class MainScene extends Phaser.Scene {
   }
 
   updateClientState(data: any) {
-    // Direct position update (No Lerp)
-    this.player1.setPosition(data.p1.x, data.p1.y);
-    this.player1.setRotation(data.p1.angle || 0);
+    // Store target state for interpolation in update()
+    this.targetState = data;
 
-    this.player2.setPosition(data.p2.x, data.p2.y);
-    this.player2.setRotation(data.p2.angle || 0);
-
+    // We can update rope immediately or interpolate it too.
+    // For now, immediate update for rope is usually fine or we can defer it.
     if (data.rope) {
       this.drawRopeFromPoints(data.rope);
     }
@@ -212,7 +214,7 @@ export class MainScene extends Phaser.Scene {
         y: (b as any).position.y,
       }));
 
-      const gameState = {
+      const stateToSend = {
         p1: {
           x: this.player1.x,
           y: this.player1.y,
@@ -226,13 +228,48 @@ export class MainScene extends Phaser.Scene {
         rope: ropePoints,
       };
 
-      network.send(gameState);
+      network.send(stateToSend);
       this.sentCount++; // Track sent packets
 
       // Draw Rope Locally
       this.drawRopeFromPoints(ropePoints);
     } else {
-      // Client: Send Input (Every Frame)
+      // Client: Interpolate towards target
+      if (this.targetState) {
+        const { p1, p2 } = this.targetState;
+
+        // P1
+        this.player1.x = Phaser.Math.Linear(
+          this.player1.x,
+          p1.x,
+          this.lerpFactor
+        );
+        this.player1.y = Phaser.Math.Linear(
+          this.player1.y,
+          p1.y,
+          this.lerpFactor
+        );
+        this.player1.setRotation(
+          Phaser.Math.Linear(this.player1.rotation, p1.angle, this.lerpFactor)
+        );
+
+        // P2
+        this.player2.x = Phaser.Math.Linear(
+          this.player2.x,
+          p2.x,
+          this.lerpFactor
+        );
+        this.player2.y = Phaser.Math.Linear(
+          this.player2.y,
+          p2.y,
+          this.lerpFactor
+        );
+        this.player2.setRotation(
+          Phaser.Math.Linear(this.player2.rotation, p2.angle, this.lerpFactor)
+        );
+      }
+
+      // Client: Send Input (Every Frame is mostly fine, or throttle too)
       network.send({ input });
       this.sentCount++; // Track sent packets
     }

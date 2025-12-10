@@ -37,6 +37,11 @@ export function createBungee(
   const dy = (endY - startY) / (segments + 1);
 
   let previousBody = bodyA;
+  // Physics Categories (Bit flags)
+  const CAT_PLAYER = 0x0001;
+  const CAT_ROPE = 0x0002;
+  const CAT_TERRAIN = 0x0004;
+
   const ropeBodies: Phaser.Types.Physics.Matter.MatterBody[] = [];
 
   for (let i = 1; i <= segments; i++) {
@@ -47,7 +52,10 @@ export function createBungee(
     const circle = scene.matter.add.circle(x, y, 5, {
       mass: 0.1,
       frictionAir: 0.05,
-      collisionFilter: { group: -1 }, // Negative group means they don't collide with each other usually, or we can use categories
+      collisionFilter: {
+        category: CAT_ROPE,
+        mask: 0xffffffff ^ CAT_PLAYER, // Collide with everything EXCEPT Players
+      },
     });
 
     ropeBodies.push(circle);
@@ -60,7 +68,7 @@ export function createBungee(
       stiffness,
       {
         damping: damping,
-        render: { visible: false }, // We draw it ourselves
+        render: { visible: false },
       }
     );
 
@@ -95,12 +103,20 @@ export function createPlayerBody(
   // Visual
   const player = scene.add.rectangle(x, y, 40, 40, color);
 
+  // Physics Categories (Redefine here or export/import, hardcoding for now for simplicity of file edit)
+  const CAT_PLAYER = 0x0001;
+  const CAT_ROPE = 0x0002;
+
   // Physics
   const body = scene.matter.add.gameObject(player, {
     shape: "rectangle",
     width: 40,
     height: 40,
-  }) as Phaser.Physics.Matter.Image; // Casting for convenience, though it's a Rect
+    collisionFilter: {
+      category: CAT_PLAYER,
+      mask: 0xffffffff ^ CAT_ROPE, // Collide with everything EXCEPT Rope (redundant safety)
+    },
+  }) as Phaser.Physics.Matter.Image;
 
   // Apply Traits (Mass, Friction, etc.)
   applyTraits(body.body!, traitId);
