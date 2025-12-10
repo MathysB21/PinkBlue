@@ -141,9 +141,24 @@ export class MainScene extends Phaser.Scene {
     // Use named function for easier removal
     this.handleNetworkData = this.handleNetworkData.bind(this);
     network.on("data", this.handleNetworkData);
+
+    // Also listen for scene shutdown/destroy to ensure cleanup
+    this.events.on(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
+    this.events.on(Phaser.Scenes.Events.DESTROY, this.shutdown, this);
   }
 
   handleNetworkData(data: any) {
+    // Guard against processing on a destroyed/inactive scene
+    if (
+      !this.sys ||
+      !this.sys.isActive() ||
+      !this.player1 ||
+      !this.player1.body
+    ) {
+      // console.warn("Ignoring network data on inactive scene");
+      return;
+    }
+
     this.packetCount++;
     this.updateDebugText();
 

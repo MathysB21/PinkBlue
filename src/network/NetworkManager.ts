@@ -21,8 +21,18 @@ export class NetworkManager {
 
     // If someone connects to us (we are host)
     this.peer.on("connection", (conn) => {
-      console.log("Incoming connection...");
-      this.handleConnection(conn);
+      console.log("Incoming connection from", conn.peer);
+
+      const onOpen = () => {
+        console.log("Connection Fully Open!");
+        this.handleConnection(conn);
+      };
+
+      if (conn.open) {
+        onOpen();
+      } else {
+        conn.on("open", onOpen);
+      }
     });
 
     // Handle errors
@@ -48,7 +58,10 @@ export class NetworkManager {
   // Join a game
   joinGame(hostId: string): Promise<void> {
     this.isHost = false;
-    const conn = this.peer.connect(hostId);
+    const conn = this.peer.connect(hostId, {
+      reliable: true,
+      serialization: "json",
+    });
 
     return new Promise((resolve, reject) => {
       conn.on("open", () => {
